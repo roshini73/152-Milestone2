@@ -8,8 +8,8 @@ class State(Enum):
     AWAITING_REASON = auto()
     AWAITING_VT_TYPE = auto()
     AWAITING_LIVESTREAM = auto()
+    AWAITING_MODERATION = auto()
 
-#MESSAGE_IDENTIFIED = auto()
     REPORT_COMPLETE = auto()
 
 class Report:
@@ -23,6 +23,9 @@ class Report:
         self.state = State.REPORT_START
         self.client = client
         self.message = None
+        self.reason = None
+        self.vt_type = None
+        self.livestream = None
 
     async def handle_message(self, message):
         '''
@@ -50,44 +53,55 @@ class Report:
                 return ["I'm sorry, I couldn't read that link. Please try again or say `cancel` to cancel."]
             guild = self.client.get_guild(int(m.group(1)))
             if not guild:
-                return ["I cannot accept reports of messages from guilds that I'm not in. Please have the guild owner add me to the guild and try again."]
+                return ["I cannot accept reports of posts from guilds that I'm not in. Please have the guild owner add me to the guild and try again."]
             channel = guild.get_channel(int(m.group(2)))
             if not channel:
                 return ["It seems this channel was deleted or never existed. Please try again or say `cancel` to cancel."]
             try:
                 message = await channel.fetch_message(int(m.group(3)))
             except discord.errors.NotFound:
-                return ["It seems this message was deleted or never existed. Please try again or say `cancel` to cancel."]
+                return ["It seems this post was deleted or never existed. Please try again or say `cancel` to cancel."]
 
             # Here we've found the message - it's up to you to decide what to do next!
-
+            self.message = message
             self.state = State.AWAITING_REASON
-            return ["I found this message:", "```" + message.author.name + ": " + message.content + "```", \
+            return ["I found this post:", "```" + message.author.name + ": " + message.content + "```", \
                     "What is your reason for reporting this post? If it is violence/terrorism please confirm by typing 'Y'. Type 'N' if not."]
 
         if self.state == State.AWAITING_REASON and message.content == self.YES_KEYWORD:
+            self.reason = True
             self.state = State.AWAITING_VT_TYPE
             return["What kind of violence/terrorism is this post promoting? If it is terrorism please confirm by typing 'Y'. Type 'N' if not."]
 
         elif self.state == State.AWAITING_REASON:
+            self.reason = False
+            self.state = State.REPORT_COMPLETE
             return ["We are currently focused on reducing violent and terrorist media but thank you for taking the time to report other types of harmful content."]
 
         if self.state == State.AWAITING_VT_TYPE and message.content == self.YES_KEYWORD:
             self.state = State.AWAITING_LIVESTREAM
+            self.vt_type = True
             return["Is this post being live streamed? If so, please confirm by typing 'Y'. Type 'N' if not."]
 
         elif self.state == State.AWAITING_VT_TYPE:
+            self.vt_type = False
+            self.state = State.REPORT_COMPLETE
             return["We are currently working on reducing specifically terrorist content but understand the harms of other forms of violence and appreciate your support in our mission to make this forum a safe space for everyone."]
 
         if self.state == State.AWAITING_LIVESTREAM and message.content == self.YES_KEYWORD:
-            self.state = State.REPORT_COMPLETE
-            return ["Thank you. Our content moderation team will review this post with high priority."]
+            self.livestream = True
+            self.state = State.AWAITING_MODERATION
+            return ["Thank you. Our content moderation team will review this post with high priority. The post may be removed and/or the user may be banned."]
 
         elif self.state == State.AWAITING_LIVESTREAM:
-            self.state = State.REPORT_COMPLETE
-            return ["Thank you. Our content moderation team will review this post."]
+            self.livestream = False
+            self.state = State.AWAITING_MODERATION
+            return ["Thank you. Our content moderation team will review this post. The post may be removed and/or the user may be banned."]
 
         return []
 
     def report_complete(self):
         return self.state == State.REPORT_COMPLETE
+
+    def awaiting_moderation(self):
+        return self.state == State.AWAITING_MODERATION
