@@ -66,7 +66,7 @@ class Moderator:
             self.state = State.MODERATION_COMPLETE
             self.banned = True
             self.removed = True
-            self.outcome = "The post did contain a livestream of terrorism. The post was removed and the user was banned. The post will be stored to assist in future legal proceedings and authorities have been notified."
+            self.outcome = "The post did contain a livestream of terrorism and was removed. The user has also been banned. The post will be stored to assist in future legal proceedings and authorities have been notified."
             return["This post will be removed and the user will be banned. The post will be stored to assist in future legal proceedings and authorities will be notified. The moderation process for this report is now complete."]
 
         elif self.state == State.AWAITING_SOURCE:
@@ -82,7 +82,7 @@ class Moderator:
         elif self.state == State.AWAITING_AID:
             self.state = State.MODERATION_COMPLETE
             self.removed = True
-            self.outcome = "The post did contain a livestream of terrorism. The post has been removed. Since the livestream was shared by a victim, we have not banned the user. The post will be stored to assist in future legal proceedings and authorities have been notified."
+            self.outcome = "The post did contain a livestream of terrorism and has been removed. Since the livestream was shared by a victim, we have not banned the user. The post will be stored to assist in future legal proceedings and authorities have been notified."
             return ["This post will be removed but stored to assist in future legal proceedings and authorities will be notified. The moderation process for this report is now complete."]
 
         return []

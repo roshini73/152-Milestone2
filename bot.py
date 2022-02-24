@@ -94,7 +94,8 @@ class ModBot(discord.Client):
             self.reports[author_id] = Report(self)
             self.userInfo[author_id] = [message.author.name, message.channel]
 
-        # Let the report class handle this message; forward all the messages it returns to uss
+
+        # Let the report class handle this message; forward all the messages it returns to us
         responses = await self.reports[author_id].handle_message(message)
         for r in responses:
             await message.channel.send(r)
@@ -137,11 +138,9 @@ class ModBot(discord.Client):
         reporter_channel = self.userInfo[author_id][1]
 
         reported_name = self.reports[self.lastReport].message.author.name
-        # reported_channel = self.reports[self.lastReport].message.author.dm_channel
-        #
-        # if not reported_channel:
-        #     await discord.create_dm(self.reports[self.lastReport].message.author.id)
-        #     reported_channel = self.reports[self.lastReport].message.author.dm_channel
+        reported_id = self.reports[self.lastReport].message.author.id
+        reported_user = await self.fetch_user(reported_id)
+
 
         post_channel = self.reports[author_id].message.channel
         flagged = self.mod.flagged
@@ -150,13 +149,13 @@ class ModBot(discord.Client):
 
         if removed and banned:
             await post_channel.send(f"The following post: ```{reported_name}:{self.reports[self.lastReport].message.content}```\nwas found to contain a livestream of terrorism and has now been removed. The user has also been banned from our platform and authorities have been notified.")
-            #await reported_channel.send(f"Hi {reported_name}. Your post ```{self.reports[self.lastReport].message.content}```\n was found to contain a livestream of terrorism and has now been removed. You have also been banned from our platform.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.reports[self.lastReport].message.content}```\nwas found to contain a livestream of terrorism and has now been removed. You have also been banned from our platform.")
         elif removed and not banned:
             await post_channel.send(f"The following post: ```{reported_name}:{self.reports[self.lastReport].message.content}```\nwas found to contain a livestream of terrorism. It has been removed and authorities have been notified.")
-            #await reported_channel.send(f"Hi {reported_name}. Your post ```{self.reports[self.lastReport].message.content}```\n was found to contain a livestream of terrorism. It has been removed and authorities have been notified.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.reports[self.lastReport].message.content}```\nwas found to contain a livestream of terrorism. It has been removed and authorities have been notified.")
         elif flagged:
             await post_channel.send(f"The following post: ```{reported_name}:{self.reports[self.lastReport].message.content}```\nwas found to contain a livestream of terrorism. It remains visible in order to signal for help. Authorities have been notified.")
-            #await reported_channel.send(f"Hi {reported_name}. Your post ```{self.reports[self.lastReport].message.content}```\n was found to contain a livestream of terrorism. It has been flagged but remains visible in order to signal for help. Authorities have been notified.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.reports[self.lastReport].message.content}```\nwas found to contain a livestream of terrorism. It has been flagged but remains visible in order to signal for help. Authorities have been notified.")
 
         await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.reports[self.lastReport].message.content}```\nIt has been reviewed. {outcome}")
 
