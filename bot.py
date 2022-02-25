@@ -106,8 +106,6 @@ class ModBot(discord.Client):
         self.reports[author_id].remove(self.addReport)
         if len(self.reports[author_id]) == 0:
             self.reports.pop(author_id)
-        if (len(self.reports) == 0):
-            self.reports = None
         self.addReport = None
     
     async def share_report(self, author, report, message):
