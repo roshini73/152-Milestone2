@@ -26,6 +26,7 @@ class Report:
         self.reason = None
         self.vt_type = None
         self.livestream = None
+        self.priority = 1
 
     async def handle_message(self, message):
         '''
@@ -66,12 +67,12 @@ class Report:
             self.message = message
             self.state = State.AWAITING_REASON
             return ["I found this post:", "```" + message.author.name + ": " + message.content + "```", \
-                    "What is your reason for reporting this post? If it is violence/terrorism please confirm by typing 'Y'. Type 'N' if not."]
+                    "What is your reason for reporting this post? If it is violence/terrorism please confirm by typing 'Y'. Type 'N' or any other key if not."]
 
         if self.state == State.AWAITING_REASON and message.content == self.YES_KEYWORD:
             self.reason = True
             self.state = State.AWAITING_VT_TYPE
-            return["What kind of violence/terrorism is this post promoting? If it is terrorism please confirm by typing 'Y'. Type 'N' if not."]
+            return["What kind of violence/terrorism is this post promoting? If it is terrorism please confirm by typing 'Y'. Type 'N' or any other key if not."]
 
         elif self.state == State.AWAITING_REASON:
             self.reason = False
@@ -81,7 +82,7 @@ class Report:
         if self.state == State.AWAITING_VT_TYPE and message.content == self.YES_KEYWORD:
             self.state = State.AWAITING_LIVESTREAM
             self.vt_type = True
-            return["Is this post being live streamed? If so, please confirm by typing 'Y'. Type 'N' if not."]
+            return["Is this post being live streamed? If so, please confirm by typing 'Y'. Type 'N' or any other key if not."]
 
         elif self.state == State.AWAITING_VT_TYPE:
             self.vt_type = False
@@ -91,12 +92,12 @@ class Report:
         if self.state == State.AWAITING_LIVESTREAM and message.content == self.YES_KEYWORD:
             self.livestream = True
             self.state = State.AWAITING_MODERATION
-            return ["Thank you. Our content moderation team will review this post with high priority. The post may be removed and/or the user may be banned."]
+            return ["Thank you. Our content moderation team will review this post with high priority. The post may be removed or flagged and/or the user may be banned."]
 
         elif self.state == State.AWAITING_LIVESTREAM:
             self.livestream = False
             self.state = State.AWAITING_MODERATION
-            return ["Thank you. Our content moderation team will review this post. The post may be removed and/or the user may be banned."]
+            return ["Thank you. Our content moderation team will review this post. The post may be removed or flagged and/or the user may be banned."]
 
         return []
 
