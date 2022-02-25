@@ -104,9 +104,11 @@ class ModBot(discord.Client):
     def delete_report(self, message, report):
         author_id = message.author.id
         self.reports[author_id].remove(report)
+        if len(self.reports[author_id] == 0):
+            self.reports.pop(author_id)
     
     async def share_report(self, author, report, message):
-        mod_channel = self.mod_channels[message.guild.id]
+        mod_channel = self.mod_channels[report.message.guild.id]
         await mod_channel.send(f"User {author} has filed a report. To start handling requests, type 'start'.")
         
 
@@ -179,8 +181,8 @@ class ModBot(discord.Client):
             for r in responses:
                 await message.channel.send(r)
             if message.content == Report.CANCEL_KEYWORD or self.addReport.report_complete():
-                self.addReport = None
                 self.delete_report(message, self.addReport)
+                self.addReport = None
                 return
             # If the report is ready for moderation, send content to mod channel
             elif self.addReport.awaiting_moderation():
@@ -188,7 +190,11 @@ class ModBot(discord.Client):
                 self.addReport = None        
 
     async def handle_mod_message(self, message):
-        if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and not self.reports:
+        if (not self.reports):
+            next = "There are no remaining reports on this channel at this time."
+            await self.mod_channels[message.guild.id].send(next)
+            return
+        if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and len(self.reports) == 0:
             next = "There are no remaining reports on this channel at this time."
             await self.mod_channels[message.guild.id].send(next)
             return
