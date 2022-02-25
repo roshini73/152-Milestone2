@@ -190,10 +190,6 @@ class ModBot(discord.Client):
                 self.addReport = None        
 
     async def handle_mod_message(self, message):
-        if (not self.reports):
-            next = "There are no remaining reports on this channel at this time."
-            await self.mod_channels[message.guild.id].send(next)
-            return
         if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and len(self.reports) == 0:
             next = "There are no remaining reports on this channel at this time."
             await self.mod_channels[message.guild.id].send(next)
