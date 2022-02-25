@@ -101,11 +101,14 @@ class ModBot(discord.Client):
             self.reports[author_id] += [Report(self, message)]
             self.addReport = self.reports[author_id][-1]
 
-    def delete_report(self, message, report):
+    def delete_report(self, message):
         author_id = message.author.id
-        self.reports[author_id].remove(report)
-        if len(self.reports[author_id] == 0):
+        self.reports[author_id].remove(self.addReport)
+        if len(self.reports[author_id]) == 0:
             self.reports.pop(author_id)
+        if (len(self.reports) == 0):
+            self.reports = None
+        self.addReport = None
     
     async def share_report(self, author, report, message):
         mod_channel = self.mod_channels[report.message.guild.id]
@@ -181,8 +184,7 @@ class ModBot(discord.Client):
             for r in responses:
                 await message.channel.send(r)
             if message.content == Report.CANCEL_KEYWORD or self.addReport.report_complete():
-                self.delete_report(message, self.addReport)
-                self.addReport = None
+                self.delete_report(message)
                 return
             # If the report is ready for moderation, send content to mod channel
             elif self.addReport.awaiting_moderation():
