@@ -271,8 +271,8 @@ class ModBot(discord.Client):
         message.content = self.decode_msg(message)
         perspective = self.eval_text(message)
         score = self.calculate_score(perspective)
-        print("Score of message " + message.content + " is: " + str(score))
-        print("Threshold level: " + str(self.threshold))
+        # print("Score of message " + message.content + " is: " + str(score))
+        # print("Threshold level: " + str(self.threshold))
         if (score > self.threshold): #add to reporting flow for moderators
             self.add_report(message)
             await self.share_report(self.user.name, self.addReport, message)
