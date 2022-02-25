@@ -10,7 +10,6 @@ from report import Report
 from mod import Moderator
 from google_trans_new import google_translator
 from unidecode import unidecode
-from langdetect import detect
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -124,24 +123,24 @@ class ModBot(discord.Client):
 
     def decode_msg(self, message):
         translator = google_translator()
-        output = unidecode(message.content) #unicode decoding
-        print(output)
+        output = message.content
         if "".join([x for x in output.split(" ")]).isnumeric():
             output = "".join([chr(int(value)) for value in output.split(" ")]) # decode ASCII values
-        if (detect(output) != 'en'):
-            output = translator.translate(output, lang_tgt='en') #translating to english so perspective API can read msg
-        print("translating: ", output)
+        output = translator.translate(output, lang_tgt='en')
+        output = unidecode(output) #unicode decoding
+        
+        
+         
         return output
 
     def set_priority_and_translate_all_reports(self):
         translator = google_translator()
         for k, v in self.reports.items():
             for report in v:
-                report.message.content = unidecode(report.message.content) #unicode decoding
                 if "".join([x for x in report.message.content.split(" ")]).isnumeric():
                     report.message.content = "".join([chr(int(value)) for value in report.message.content.split(" ")]) # decode ASCII values ??? don't think users will notice this
-                if (detect(report.message.content) != 'en'):
-                    report.message.content = translator.translate(report.message.content, lang_tgt='en') #translating to english so perspective API can read msg
+                report.message.content = translator.translate(report.message.content, lang_tgt='en')
+                report.message.content = unidecode(report.message.content) #unicode decoding
                 perspective = self.eval_text(report.message)
                 score = self.calculate_score(perspective)
                 report.priority = 100 * score
@@ -215,11 +214,11 @@ class ModBot(discord.Client):
                 return
 
             if self.mod.moderation_complete():
+                
                 await self.send_updates(self.mod.outcome)
 
                 if (self.mod.banned or self.mod.removed or self.mod.flagged):
-                    self.threshold = max(0.5, self.threshold + self.alpha * self.modReport.priority/100) # realigning threshold
-
+                    self.threshold = max(0.5, (1- self.alpha) * self.threshold + self.alpha * self.modReport.priority/100) # realigning threshold
                 self.reports[self.currReporter].remove(self.modReport)
                 self.priority_reports_arr.pop(0)
                 if len(self.reports[self.currReporter]) == 0:
@@ -235,6 +234,7 @@ class ModBot(discord.Client):
         reporter_name = self.userInfo[self.currReporter][0]
         reporter_channel = self.userInfo[self.currReporter][1]
 
+        auto = self.modReport.auto
         reported_name = self.modReport.message.author.name
         reported_id = self.modReport.message.author.id
         reported_user = await self.fetch_user(reported_id)
@@ -255,7 +255,8 @@ class ModBot(discord.Client):
             await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It remains visible in order to signal for help. Authorities have been notified.")
             await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It has been flagged but remains visible in order to signal for help. Authorities have been notified.")
 
-        await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.modReport.message.content}```\nIt has been reviewed. {outcome}")
+        if (not auto):
+            await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.modReport.message.content}```\nIt has been reviewed. {outcome}")
 
     async def handle_channel_message(self, message):
         if message.channel.name == f'group-{self.group_num}-mod':
@@ -263,7 +264,6 @@ class ModBot(discord.Client):
 
         elif message.channel.name == f'group-{self.group_num}':
             await self.auto_handle_message(message)
-
         else:
             return
 
@@ -271,6 +271,8 @@ class ModBot(discord.Client):
         message.content = self.decode_msg(message)
         perspective = self.eval_text(message)
         score = self.calculate_score(perspective)
+        print("Score of message " + message.content + " is: " + str(score))
+        print("Threshold level: " + str(self.threshold))
         if (score > self.threshold): #add to reporting flow for moderators
             self.add_report(message)
             await self.share_report(self.user.name, self.addReport, message)
