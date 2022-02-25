@@ -8,6 +8,8 @@ import re
 import requests
 from report import Report
 from mod import Moderator
+from google_trans_new import google_translator
+from unidecode import unidecode
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -40,6 +42,10 @@ class ModBot(discord.Client):
         self.addReport = None
         self.modReport = 0
         self.currReporter = None
+        self.priority_reports_arr = None
+
+        self.threshold = 0.7
+        self.alpha = 0.1 # Hyperparameter to change weighting of threshold learning
 
     async def on_ready(self):
         print(f'{self.user.name} has connected to Discord! It is these guilds:')
@@ -75,86 +81,160 @@ class ModBot(discord.Client):
         else:
             await self.handle_dm(message)
 
+    async def on_message_edit(self, before_msg, after_msg):
+        if after_msg.channel.name == f'group-{self.group_num}':
+            before_msg.content = self.decode_msg(before_msg)
+            after_msg.content = self.decode_msg(after_msg)
+            await self.auto_handle_message(before_msg)
+            await self.auto_handle_message(after_msg)
+
+
+    def add_report(self, message):
+        author_id = message.author.id
+        # If we don't currently have an active report for this user, add one
+        if author_id not in self.reports:
+            self.reports[author_id] = [Report(self, message)]
+            self.userInfo[author_id] = [message.author.name, message.channel]
+            self.addReport = self.reports[author_id][-1]
+
+        elif author_id in self.reports and not self.addReport:
+            self.reports[author_id] += [Report(self, message)]
+            self.addReport = self.reports[author_id][-1]
+
+    def delete_report(self, message, report):
+        author_id = message.author.id
+        self.reports[author_id].remove(report)
+    
+    async def share_report(self, author, report, message):
+        mod_channel = self.mod_channels[message.guild.id]
+        await mod_channel.send(f"User {author} has filed a report. To start handling requests, type 'start'.")
+        
+
+    async def get_messages(self, message):
+        responses = await self.mod.handle_message(message)
+        for r in responses:
+            await self.mod_channels[message.guild.id].send(r)
+
+    def calculate_score(self, score):
+        threat = score["THREAT"]
+        toxicity = score["TOXICITY"]
+        threat_exp = score["THREAT_EXPERIMENTAL"]
+        return 0.8 * threat + 0.1 * toxicity + 0.1 * threat_exp
+
+    def decode_msg(self, message):
+        translator = google_translator()
+        output = message.content
+        if "".join([x for x in output.split(" ")]).isnumeric():
+            output = "".join([chr(int(value)) for value in output.split(" ")]) # decode ASCII values
+        output = translator.translate(output, lang_tgt='en')
+        output = unidecode(output) #unicode decoding
+        
+        
+         
+        return output
+
+    def set_priority_and_translate_all_reports(self):
+        translator = google_translator()
+        for k, v in self.reports.items():
+            for report in v:
+                if "".join([x for x in report.message.content.split(" ")]).isnumeric():
+                    report.message.content = "".join([chr(int(value)) for value in report.message.content.split(" ")]) # decode ASCII values ??? don't think users will notice this
+                report.message.content = translator.translate(report.message.content, lang_tgt='en')
+                report.message.content = unidecode(report.message.content) #unicode decoding
+                perspective = self.eval_text(report.message)
+                score = self.calculate_score(perspective)
+                report.priority = 100 * score
+
+    def build_sort_reports(self):
+        if (self.reports):
+            self.set_priority_and_translate_all_reports()
+            reports = [[author_id, report] for author_id in self.reports.keys() for report in self.reports[author_id]]
+            self.priority_reports_arr = sorted(reports, key = lambda x: x[1].priority, reverse=True) # only sort once on init
+
+    async def init_mod(self, message):
+        if (self.reports):
+            self.currReporter = self.priority_reports_arr[0][0]
+            self.modReport = self.priority_reports_arr[0][1]
+            self.mod = Moderator(self.modReport)
+            await self.get_messages(message)
+            
     async def handle_dm(self, message):
         # Handle a help message
         if message.content == Report.HELP_KEYWORD:
-            #print("HERE")
             reply =  "Use the `report` command to begin the reporting process.\n"
             reply += "Use the `cancel` command to cancel the report process.\n"
             await message.channel.send(reply)
             return
 
-        author_id = message.author.id
-        responses = []
-
         # Only respond to messages if they're part of a reporting flow
-        if author_id not in self.reports and not message.content.startswith(Report.START_KEYWORD):
+        if message.content == Report.START_KEYWORD:
+            self.add_report(message)
+            responses = await self.addReport.handle_message(message)
+            for r in responses:
+                await message.channel.send(r)
             return
-
-        # If we don't currently have an active report for this user, add one
-        if author_id not in self.reports:
-            self.reports[author_id] = [Report(self)]
-            self.userInfo[author_id] = [message.author.name, message.channel]
-            self.addReport = self.reports[author_id][-1]
-
-        elif author_id in self.reports and not self.addReport:
-            self.reports[author_id] += [Report(self)]
-            self.addReport = self.reports[author_id][-1]
-
-        # Let the report class handle this message; forward all the messages it returns to us
-        responses = await self.addReport.handle_message(message)
-        for r in responses:
-            await message.channel.send(r)
-
-        if self.addReport.report_complete():
-            self.reports[author_id].remove(self.addReport)
-            if len(self.reports[author_id]) == 0:
-                self.reports.pop(author_id)
-            self.addReport = None
-
-        # If the report is ready for moderation, send content to mod channel
-        elif self.addReport.awaiting_moderation():
-            await self.share_report(author_id, self.addReport, message)
-            self.addReport = None
-
-    async def share_report(self, author_id, report, message):
-        mod_channel = self.mod_channels[report.message.guild.id]
-        await mod_channel.send(f"User {message.author} has filed a report. To start handling requests, type 'start'.")
+        
+        if (self.addReport):
+            responses = await self.addReport.handle_message(message)
+            for r in responses:
+                await message.channel.send(r)
+            if message.content == Report.CANCEL_KEYWORD or self.addReport.report_complete():
+                self.addReport = None
+                self.delete_report(message, self.addReport)
+                return
+            # If the report is ready for moderation, send content to mod channel
+            elif self.addReport.awaiting_moderation():
+                await self.share_report(message.author, self.addReport, message)
+                self.addReport = None        
 
     async def handle_mod_message(self, message):
-        if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and self.reports:
-            reports = [[author_id, report] for author_id in self.reports.keys() for report in self.reports[author_id]]
-
-            reports = sorted(reports, key = lambda x: x[1].priority)
-
-            self.modReport = reports[0][1]
-            self.currReporter = reports[0][0]
-            self.mod = Moderator(self.modReport)
-        mod_channel = self.mod_channels[self.mod.report.message.guild.id]
-
         if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and not self.reports:
-            next = "There are no remaining reports at this time."
-            await mod_channel.send(next)
+            next = "There are no remaining reports on this channel at this time."
+            await self.mod_channels[message.guild.id].send(next)
+            return
+        
+        if (message.content == Moderator.START_KEYWORD):
+            self.build_sort_reports()
+            await self.init_mod(message)
+            return
 
-        responses = await self.mod.handle_message(message)
+        if (message.content == Moderator.NEXT_KEYWORD) and not self.mod:
+            await self.init_mod(message)
+            return
 
-        for r in responses:
-            await mod_channel.send(r)
-        if self.mod.moderation_complete():
-            await self.send_updates(self.mod.outcome)
-            self.reports[self.currReporter].remove(self.modReport)
-            if len(self.reports[self.currReporter]) == 0:
-                self.reports.pop(self.currReporter)
-            self.currReporter = None
-            self.mod = None
+        if (self.mod):
+            await self.get_messages(message)
+            if (message.content == Moderator.CANCEL_KEYWORD):
+                self.currReporter = None
+                self.modReport = None
+                self.mod = None
+                self.priority_reports_arr = None
+                next = "Cancelled moderating, to resume please start again by typing 'start'."
+                await self.mod_channels[message.guild.id].send(next)
+                return
 
-            next = "To continue moderating remaining reports type 'next'." if self.reports else "There are no remaining reports at this time."
-            await mod_channel.send(next)
+            if self.mod.moderation_complete():
+                
+                await self.send_updates(self.mod.outcome)
 
+                if (self.mod.banned or self.mod.removed or self.mod.flagged):
+                    self.threshold = max(0.5, (1- self.alpha) * self.threshold + self.alpha * self.modReport.priority/100) # realigning threshold
+                self.reports[self.currReporter].remove(self.modReport)
+                self.priority_reports_arr.pop(0)
+                if len(self.reports[self.currReporter]) == 0:
+                    self.reports.pop(self.currReporter)
+                self.currReporter = None
+                self.modReport = None
+                self.mod = None
+                next = "To continue moderating remaining reports type 'next'. To cancel, type 'cancel'." if self.reports else "There are no remaining reports at this time."
+                await self.mod_channels[message.guild.id].send(next)
+
+    
     async def send_updates(self,outcome):
         reporter_name = self.userInfo[self.currReporter][0]
         reporter_channel = self.userInfo[self.currReporter][1]
 
+        auto = self.modReport.auto
         reported_name = self.modReport.message.author.name
         reported_id = self.modReport.message.author.id
         reported_user = await self.fetch_user(reported_id)
@@ -175,24 +255,29 @@ class ModBot(discord.Client):
             await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It remains visible in order to signal for help. Authorities have been notified.")
             await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It has been flagged but remains visible in order to signal for help. Authorities have been notified.")
 
-        await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.modReport.message.content}```\nIt has been reviewed. {outcome}")
+        if (not auto):
+            await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.modReport.message.content}```\nIt has been reviewed. {outcome}")
 
     async def handle_channel_message(self, message):
-
-        if message.channel.name == f'group-{self.group_num}-mod' and self.reports.keys():
+        if message.channel.name == f'group-{self.group_num}-mod':
             await self.handle_mod_message(message)
 
-        # Only handle messages sent in the "group-#" channel
-        # if message.channel.name == f'group-{self.group_num}':
-        #     # Forward the message to the mod channel
-        #     mod_channel = self.mod_channels[message.guild.id]
-        #     await mod_channel.send(f'Forwarded message:\n{message.author.name}: "{message.content}"')
-        #
-        #     scores = self.eval_text(message)
-        #     await mod_channel.send(self.code_format(json.dumps(scores, indent=2)))
-
+        elif message.channel.name == f'group-{self.group_num}':
+            await self.auto_handle_message(message)
         else:
             return
+
+    async def auto_handle_message(self, message):
+        message.content = self.decode_msg(message)
+        perspective = self.eval_text(message)
+        score = self.calculate_score(perspective)
+        print("Score of message " + message.content + " is: " + str(score))
+        print("Threshold level: " + str(self.threshold))
+        if (score > self.threshold): #add to reporting flow for moderators
+            self.add_report(message)
+            await self.share_report(self.user.name, self.addReport, message)
+            self.addReport = None
+        
 
     def eval_text(self, message):
         '''
@@ -205,6 +290,7 @@ class ModBot(discord.Client):
             'comment': {'text': message.content},
             'languages': ['en'],
             'requestedAttributes': {
+                                    'THREAT_EXPERIMENTAL' : {},
                                     'SEVERE_TOXICITY': {}, 'PROFANITY': {},
                                     'IDENTITY_ATTACK': {}, 'THREAT': {},
                                     'TOXICITY': {}, 'FLIRTATION': {}
