@@ -13,6 +13,7 @@ class State(Enum):
 
 class Moderator:
     START_KEYWORD = "start"
+    NEXT_KEYWORD = "next"
     CANCEL_KEYWORD = "cancel"
     HELP_KEYWORD = "help"
     T_KEYWORD = "T"
@@ -39,14 +40,14 @@ class Moderator:
             reason = "violence/terrorism" if self.report.reason else "reasons other than violence/terrorism"
             vt_type = "terrorism" if self.report.vt_type else "violence"
             live = "is" if self.report.livestream else "is not"
-            return(["The report is for the following message:", "```" + self.report.message.author.name + ": " + self.report.message.content + "```", \
+            return(["There is a report for the following message:", "```" + self.report.message.author.name + ": " + self.report.message.content + "```", \
             "The post was reported for "  + reason + ", specifically " + vt_type + " and " + live + " reported to be a livestream.", \
-            "Is this post actually being live streamed? If so, please confirm by typing \'Y\'. Type \'N\' if not."])
+            "Is this post actually being live streamed? If so, please confirm by typing \'Y\'. Type \'N\' or any other key if not."])
 
 
         if self.state == State.AWAITING_LIVESTREAM and message.content == self.YES_KEYWORD:
             self.state = State.AWAITING_TERRORISM
-            return ["Thank you for confirming that this is a livestream. Is the content of the livestream in fact terrorism? Please confirm by typing 'Y'. Type 'N' if not."]
+            return ["Thank you for confirming that this is a livestream. Is the content of the livestream in fact terrorism? Please confirm by typing 'Y'. Type 'N' or any other key if not."]
 
         elif self.state == State.AWAITING_LIVESTREAM:
             self.state = State.MODERATION_COMPLETE
@@ -55,7 +56,7 @@ class Moderator:
 
         if self.state == State.AWAITING_TERRORISM and message.content == self.YES_KEYWORD:
             self.state = State.AWAITING_SOURCE
-            return["Who is livestreaming this event? If it is the terrorist please type 'T'. If it is a victim, type 'V'."]
+            return["Who is livestreaming this event? If it is the terrorist please type 'T'. If it is a victim, type 'V' or any other key."]
 
         elif self.state == State.AWAITING_TERRORISM:
             self.state = State.MODERATION_COMPLETE
@@ -71,7 +72,7 @@ class Moderator:
 
         elif self.state == State.AWAITING_SOURCE:
             self.state = State.AWAITING_AID
-            return["Can this livestream enable the victim to acquire help? Please confirm by typing 'Y'. Type 'N' if not."]
+            return["Can this livestream enable the victim to acquire help? Please confirm by typing 'Y'. Type 'N' or any other key if not."]
 
         if self.state == State.AWAITING_AID and message.content == self.YES_KEYWORD:
             self.state = State.MODERATION_COMPLETE
