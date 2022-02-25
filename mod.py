@@ -37,6 +37,10 @@ class Moderator:
         '''
         if self.state == State.MODERATION_START:
             self.state = State.AWAITING_LIVESTREAM
+            if (self.report.auto):
+                return(["There is a report for the following message: " + "```" + self.report.message.author.name + ": " + self.report.message.content + "```" + \
+                    "This post was automatically flagged by our bot. \nPlease answer some questions to help our friendly flagging bot. \nIs this post actually being live streamed? " + \
+                    "If so, please confirm by typing \'Y\'. Type \'N\' if not."])
             reason = "violence/terrorism" if self.report.reason else "reasons other than violence/terrorism"
             vt_type = "terrorism" if self.report.vt_type else "violence"
             live = "is" if self.report.livestream else "is not"

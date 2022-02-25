@@ -8,7 +8,9 @@ import re
 import requests
 from report import Report
 from mod import Moderator
-from google_trans_new import google_translator  
+from google_trans_new import google_translator
+from unidecode import unidecode
+from langdetect import detect
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -80,26 +82,33 @@ class ModBot(discord.Client):
         else:
             await self.handle_dm(message)
 
+    async def on_message_edit(self, before_msg, after_msg):
+        if after_msg.channel.name == f'group-{self.group_num}':
+            before_msg.content = self.decode_msg(before_msg)
+            after_msg.content = self.decode_msg(after_msg)
+            await self.auto_handle_message(before_msg)
+            await self.auto_handle_message(after_msg)
+
 
     def add_report(self, message):
         author_id = message.author.id
         # If we don't currently have an active report for this user, add one
         if author_id not in self.reports:
-            self.reports[author_id] = [Report(self)]
+            self.reports[author_id] = [Report(self, message)]
             self.userInfo[author_id] = [message.author.name, message.channel]
             self.addReport = self.reports[author_id][-1]
 
         elif author_id in self.reports and not self.addReport:
-            self.reports[author_id] += [Report(self)]
+            self.reports[author_id] += [Report(self, message)]
             self.addReport = self.reports[author_id][-1]
 
     def delete_report(self, message, report):
         author_id = message.author.id
         self.reports[author_id].remove(report)
     
-    async def share_report(self, author_id, report, message):
-        mod_channel = self.mod_channels[report.message.guild.id]
-        await mod_channel.send(f"User {message.author} has filed a report. To start handling requests, type 'start'.")
+    async def share_report(self, author, report, message):
+        mod_channel = self.mod_channels[message.guild.id]
+        await mod_channel.send(f"User {author} has filed a report. To start handling requests, type 'start'.")
         
 
     async def get_messages(self, message):
@@ -113,11 +122,26 @@ class ModBot(discord.Client):
         threat_exp = score["THREAT_EXPERIMENTAL"]
         return 0.8 * threat + 0.1 * toxicity + 0.1 * threat_exp
 
+    def decode_msg(self, message):
+        translator = google_translator()
+        output = unidecode(message.content) #unicode decoding
+        print(output)
+        if "".join([x for x in output.split(" ")]).isnumeric():
+            output = "".join([chr(int(value)) for value in output.split(" ")]) # decode ASCII values
+        if (detect(output) != 'en'):
+            output = translator.translate(output, lang_tgt='en') #translating to english so perspective API can read msg
+        print("translating: ", output)
+        return output
+
     def set_priority_and_translate_all_reports(self):
         translator = google_translator()
         for k, v in self.reports.items():
             for report in v:
-                # report.message.content = translator.translate(report.message.content, lang_tgt='en')
+                report.message.content = unidecode(report.message.content) #unicode decoding
+                if "".join([x for x in report.message.content.split(" ")]).isnumeric():
+                    report.message.content = "".join([chr(int(value)) for value in report.message.content.split(" ")]) # decode ASCII values ??? don't think users will notice this
+                if (detect(report.message.content) != 'en'):
+                    report.message.content = translator.translate(report.message.content, lang_tgt='en') #translating to english so perspective API can read msg
                 perspective = self.eval_text(report.message)
                 score = self.calculate_score(perspective)
                 report.priority = 100 * score
@@ -143,7 +167,6 @@ class ModBot(discord.Client):
             await message.channel.send(reply)
             return
 
-        author_id = message.author.id
         # Only respond to messages if they're part of a reporting flow
         if message.content == Report.START_KEYWORD:
             self.add_report(message)
@@ -162,11 +185,10 @@ class ModBot(discord.Client):
                 return
             # If the report is ready for moderation, send content to mod channel
             elif self.addReport.awaiting_moderation():
-                await self.share_report(author_id, self.addReport, message)
+                await self.share_report(message.author, self.addReport, message)
                 self.addReport = None        
 
     async def handle_mod_message(self, message):
-
         if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and not self.reports:
             next = "There are no remaining reports on this channel at this time."
             await self.mod_channels[message.guild.id].send(next)
@@ -205,11 +227,9 @@ class ModBot(discord.Client):
                 self.currReporter = None
                 self.modReport = None
                 self.mod = None
-                next = "To continue moderating remaining reports type 'next'." if self.reports else "There are no remaining reports at this time."
+                next = "To continue moderating remaining reports type 'next'. To cancel, type 'cancel'." if self.reports else "There are no remaining reports at this time."
                 await self.mod_channels[message.guild.id].send(next)
 
-
-            
     
     async def send_updates(self,outcome):
         reporter_name = self.userInfo[self.currReporter][0]
@@ -238,7 +258,6 @@ class ModBot(discord.Client):
         await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.modReport.message.content}```\nIt has been reviewed. {outcome}")
 
     async def handle_channel_message(self, message):
-
         if message.channel.name == f'group-{self.group_num}-mod':
             await self.handle_mod_message(message)
 
@@ -249,11 +268,13 @@ class ModBot(discord.Client):
             return
 
     async def auto_handle_message(self, message):
+        message.content = self.decode_msg(message)
         perspective = self.eval_text(message)
         score = self.calculate_score(perspective)
         if (score > self.threshold): #add to reporting flow for moderators
-            self.reports[message.author.id] = message
-        return
+            self.add_report(message)
+            await self.share_report(self.user.name, self.addReport, message)
+            self.addReport = None
         
 
     def eval_text(self, message):

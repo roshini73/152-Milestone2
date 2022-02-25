@@ -21,13 +21,14 @@ class Report:
 
     ALL_OPTIONS = [START_KEYWORD, CANCEL_KEYWORD, HELP_KEYWORD, YES_KEYWORD, NO_KEYWORD]
 
-    def __init__(self, client):
+    def __init__(self, client, message):
         self.state = State.REPORT_START
         self.client = client
-        self.message = None
+        self.message = message
         self.reason = None
         self.vt_type = None
         self.livestream = None
+        self.auto = True
         self.priority = 1
 
     async def handle_message(self, message):
@@ -42,6 +43,7 @@ class Report:
             return ["Report cancelled."]
 
         if self.state == State.REPORT_START:
+            self.auto = False
             reply =  "Thank you for starting the reporting process. "
             reply += "Say `help` at any time for more information.\n\n"
             reply += "Please copy paste the link to the message you want to report.\n"
