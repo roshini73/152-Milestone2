@@ -6,11 +6,12 @@ class State(Enum):
     REPORT_START = auto()
     AWAITING_MESSAGE = auto()
     AWAITING_REASON = auto()
-    AWAITING_VT_TYPE = auto()
+    #AWAITING_VT_TYPE = auto()
     AWAITING_LIVESTREAM = auto()
     AWAITING_MODERATION = auto()
-
+    AWAITING_DETAILS = auto()
     REPORT_COMPLETE = auto()
+    AWAITING_IMMEDIACY = auto()
 
 class Report:
     START_KEYWORD = "report"
@@ -18,18 +19,29 @@ class Report:
     HELP_KEYWORD = "help"
     YES_KEYWORD = "Y"
     NO_KEYWORD = "N"
+    FALSE_INFO_KEYWORD = "A"
+    SPAM_KEYWORD = "B"
+    HARASSMENT_KEYWORD = "C"
+    VIOLENCE_KEYWORD = "D"
+    TERRORISM_KEYWORD = "E"
+    HATE_SPEECH_KEYWORD = "F"
+    reasons = {"A": "false information", "B": "spam", "C": "harassment", "D": "violence", "E": "terrorism", "F": "hate speech"}
 
     ALL_OPTIONS = [START_KEYWORD, CANCEL_KEYWORD, HELP_KEYWORD, YES_KEYWORD, NO_KEYWORD]
+    priorities = {"false information": 1, "spam": 1, "harassment": 1, "violence": 2, "terrorism": 3, "hate speech": 1}
 
     def __init__(self, client, message):
+        self.reportReason = None
         self.state = State.REPORT_START
         self.client = client
         self.message = message
-        self.reason = None
+        self.reason = None #terrrorism or not
         self.vt_type = None
         self.livestream = None
         self.auto = True
-        self.priority = 1
+        self.priority = 0
+        self.extra = ""
+        self.immediate = False
 
     async def handle_message(self, message):
         '''
@@ -46,8 +58,8 @@ class Report:
             self.auto = False
             reply =  "Thank you for starting the reporting process. "
             reply += "Say `help` at any time for more information.\n\n"
-            reply += "Please copy paste the link to the message you want to report.\n"
-            reply += "You can obtain this link by right-clicking the message and clicking `Copy Message Link`."
+            reply += "Please copy paste the link to the post you want to report.\n"
+            reply += "You can obtain this link by right-clicking the post and clicking `Copy Message Link`."
             self.state = State.AWAITING_MESSAGE
             return [reply]
 
@@ -71,37 +83,51 @@ class Report:
             self.message = message
             self.state = State.AWAITING_REASON
             return ["I found this post:", "```" + message.author.name + ": " + message.content + "```", \
-                    "What is your reason for reporting this post? If it is violence/terrorism please confirm by typing 'Y'. Type 'N' if not."]
+                    "What is your reason for reporting this post? \nA: False Information\nB: Spam \nC: Harassment \nD: Violence \nE: Terrorism \nF: Hate Speech \nIf your reason for reporting this post does not fall into any of the specified categories above, please share in a few words your reason for reporting this post."]
 
-        if self.state == State.AWAITING_REASON and message.content == self.YES_KEYWORD:
-            self.reason = True
-            self.state = State.AWAITING_VT_TYPE
-            return["What kind of violence/terrorism is this post promoting? If it is terrorism please confirm by typing 'Y'. Type 'N' if not."]
+        if self.state == State.AWAITING_REASON:
+            if message.content == self.TERRORISM_KEYWORD:
+                self.reason = True
+            if message.content in self.reasons:
+                self.reportReason = self.reasons[message.content]
+                self.priority += self.priorities[self.reportReason]
+            else:
+                self.reportReason = message.content
+                self.priority += 1
 
-        elif self.state == State.AWAITING_REASON and message.content == self.NO_KEYWORD:
-            self.reason = False
-            self.state = State.REPORT_COMPLETE
-            return ["We are currently focused on reducing violent and terrorist media but thank you for taking the time to report other types of harmful content."]
+            self.state = State.AWAITING_IMMEDIACY
+            return["Do the contents of this post pose an ongoing or immediate threat? Type 'Y' for yes and 'N' for no."]
 
-        if self.state == State.AWAITING_VT_TYPE and message.content == self.YES_KEYWORD:
-            self.state = State.AWAITING_LIVESTREAM
-            self.vt_type = True
-            return["Is this post being live streamed? If so, please confirm by typing 'Y'. Type 'N' if not."]
+        if self.state == State.AWAITING_IMMEDIACY:
+            if message.content == self.YES_KEYWORD:
+                self.immediate = True
+                self.priority += 2
+                self.state = State.AWAITING_LIVESTREAM
+                return["You stated that the contents of this post pose an ongoing or immediate threat. Is this post being livestreamed? Type 'Y' for yes and 'N' for no."]
+            else:
+                self.state = State.AWAITING_DETAILS
+                self.priority += 1
+                return["If you would like to provide any additional details, please do so now. Otherwise type 'N'."]
 
-        elif self.state == State.AWAITING_VT_TYPE and message.content == self.NO_KEYWORD:
-            self.vt_type = False
-            self.state = State.REPORT_COMPLETE
-            return["We are currently working on reducing specifically terrorist content but understand the harms of other forms of violence and appreciate your support in our mission to make this forum a safe space for everyone."]
-
-        if self.state == State.AWAITING_LIVESTREAM and message.content == self.YES_KEYWORD:
-            self.livestream = True
+        if self.state == State.AWAITING_DETAILS:
             self.state = State.AWAITING_MODERATION
-            return ["Thank you. Our content moderation team will review this post with high priority. The post may be removed or flagged and/or the user may be banned."]
+            if message.content != self.NO_KEYWORD:
+                self.extra = message.content
+            print(self.priority)
+            if self.livestream:
+                return ["Thank you. Our content moderation team will review this post with high priority. The post may be removed or flagged and/or the user may be banned."]
+            else:
+                return["Thank you. Our content moderation team will review this post. The post may be removed or flagged and/or the user may be banned."]
 
-        elif self.state == State.AWAITING_LIVESTREAM and message.content == self.NO_KEYWORD:
-            self.livestream = False
-            self.state = State.AWAITING_MODERATION
-            return ["Thank you. Our content moderation team will review this post. The post may be removed or flagged and/or the user may be banned."]
+        if self.state == State.AWAITING_LIVESTREAM:
+            if message.content == self.YES_KEYWORD:
+                self.livestream = True
+                self.priority += 2
+            else:
+                self.livestream = False
+                self.priority += 1
+            self.state = State.AWAITING_DETAILS
+            return ["If you would like to provide any additional details, please do so now. Otherwise type 'N'."]
 
         return ["Not a valid option, please choose again from the prompt or type 'cancel' to cancel moderation."]
 
