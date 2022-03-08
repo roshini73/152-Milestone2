@@ -107,11 +107,11 @@ class ModBot(discord.Client):
         if len(self.reports[author_id]) == 0:
             self.reports.pop(author_id)
         self.addReport = None
-    
+
     async def share_report(self, author, report, message):
         mod_channel = self.mod_channels[report.message.guild.id]
         await mod_channel.send(f"User {author} has filed a report. To start handling requests, type 'start'.")
-        
+
 
     async def get_messages(self, message):
         responses = await self.mod.handle_message(message)
@@ -131,9 +131,9 @@ class ModBot(discord.Client):
             output = "".join([chr(int(value)) for value in output.split(" ")]) # decode ASCII values
         output = translator.translate(output, lang_tgt='en')
         output = unidecode(output) #unicode decoding
-        
-        
-         
+
+
+
         return output
 
     def set_priority_and_translate_all_reports(self):
@@ -160,7 +160,7 @@ class ModBot(discord.Client):
             self.modReport = self.priority_reports_arr[0][1]
             self.mod = Moderator(self.modReport)
             await self.get_messages(message)
-            
+
     async def handle_dm(self, message):
         # Handle a help message
         if message.content == Report.HELP_KEYWORD:
@@ -176,7 +176,7 @@ class ModBot(discord.Client):
             for r in responses:
                 await message.channel.send(r)
             return
-        
+
         if (self.addReport):
             responses = await self.addReport.handle_message(message)
             for r in responses:
@@ -187,14 +187,14 @@ class ModBot(discord.Client):
             # If the report is ready for moderation, send content to mod channel
             elif self.addReport.awaiting_moderation():
                 await self.share_report(message.author, self.addReport, message)
-                self.addReport = None        
+                self.addReport = None
 
     async def handle_mod_message(self, message):
         if (message.content == Moderator.START_KEYWORD or message.content == Moderator.NEXT_KEYWORD) and len(self.reports) == 0:
             next = "There are no remaining reports on this channel at this time."
             await self.mod_channels[message.guild.id].send(next)
             return
-        
+
         if (message.content == Moderator.START_KEYWORD):
             self.build_sort_reports()
             await self.init_mod(message)
@@ -216,7 +216,7 @@ class ModBot(discord.Client):
                 return
 
             if self.mod.moderation_complete():
-                
+
                 await self.send_updates(self.mod.outcome)
 
                 if (self.mod.banned or self.mod.removed or self.mod.flagged):
@@ -231,7 +231,7 @@ class ModBot(discord.Client):
                 next = "To continue moderating remaining reports type 'next'. To cancel, type 'cancel'." if self.reports else "There are no remaining reports at this time."
                 await self.mod_channels[message.guild.id].send(next)
 
-    
+
     async def send_updates(self,outcome):
         reporter_name = self.userInfo[self.currReporter][0]
         reporter_channel = self.userInfo[self.currReporter][1]
@@ -248,14 +248,17 @@ class ModBot(discord.Client):
         banned = self.mod.banned
 
         if removed and banned:
-            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to contain a livestream of terrorism and has now been removed. The user has also been banned from our platform and authorities have been notified.")
-            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to contain a livestream of terrorism and has now been removed. You have also been banned from our platform.")
+            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + " and has now been removed. The user has also been banned from our platform and authorities have been notified.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + " and has now been removed. You have also been banned from our platform.")
         elif removed and not banned:
-            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It has been removed and authorities have been notified.")
-            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It has been removed and authorities have been notified.")
+            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ". It has been removed and authorities have been notified.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ". It has been removed and authorities have been notified.")
         elif flagged:
-            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It remains visible in order to signal for help. Authorities have been notified.")
-            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to contain a livestream of terrorism. It has been flagged but remains visible in order to signal for help. Authorities have been notified.")
+            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ".")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ".")
+        elif flagged and banned:
+            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ". The user has been banned from our platform and authorities have been notified.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ". The user has been banned from our platform and authorities have been notified.")
 
         if (not auto):
             await reporter_channel.send(f"Hi {reporter_name}! Thank you for your recent report on the following post: ```{reported_name}:{self.modReport.message.content}```\nIt has been reviewed. {outcome}")
@@ -279,7 +282,7 @@ class ModBot(discord.Client):
             self.add_report(message)
             await self.share_report(self.user.name, self.addReport, message)
             self.addReport = None
-        
+
 
     def eval_text(self, message):
         '''
