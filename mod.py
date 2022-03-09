@@ -33,6 +33,7 @@ class Moderator:
         self.banned = False
         self.removed = False
         self.flagged = False
+        self.stored = False
         self.category = None
         self.immediate = False
         self.livestream = False
@@ -172,6 +173,8 @@ class Moderator:
         for i in sorted(actions):
             if ((i != 2) or (i ==2 and 3 not in actions)) and i in mp.keys():
                 res += mp[i] + " "
+                if i == 1 or i == 5:
+                    self.stored = True
                 if i == 2:
                     self.flagged = True
                 if i == 3:

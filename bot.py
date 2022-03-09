@@ -261,11 +261,15 @@ class ModBot(discord.Client):
         reported_id = self.modReport.message.author.id
         reported_user = await self.fetch_user(reported_id)
 
-
         post_channel = self.modReport.message.channel
         flagged = self.mod.flagged
         removed = self.mod.removed
         banned = self.mod.banned
+        stored = self.mod.stored
+
+        if stored:
+            await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas stored in our db.")
+            await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas stored in our db.")
 
         # Check if user is banned from the group
         query = { "_id": reported_id }
