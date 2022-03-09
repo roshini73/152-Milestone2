@@ -84,34 +84,6 @@ class ModBot(discord.Client):
         if message.author.id == self.user.id:
             return
         
-        # Find the mod channel
-        # mod_channel = self.mod_channels[message.guild.id]
-        
-        # # Check if user is banned from the group
-        # myquery = { "_id": message.author.id }
-        # num_reports = collection.count_documents(myquery)
-
-        # # this user has had no reports filed against them
-        # if num_reports <= 0:
-        #     post = {"_id": message.author.id, "score": 1}
-        #     collection.insert_one(post)
-        #     await mod_channel.send(f'A first successful report against user: {message.author.name} has been filed. This user has been added to the db.')
-        #     await message.author.send(f'Dear {message.author.name}, a report has been successfully filed against you.\nThis is your first strike. After three strikes you will be banned from the channel.')
-
-        # # this user has had 5 or less reports filed against them
-        # else:
-        #     query = {"_id": message.author.id}
-        #     user = collection.find(query)
-        #     for result in user:
-        #         score = result["score"]
-        #     score = score + 1
-        #     collection.update_one({"_id":message.author.id}, {"$set":{"score":score}})
-
-        #     if score >= 3:
-        #         await mod_channel.send(f'A report has successfully been filed against user: {message.author.name}. This is the user\'s third report and as a result they are banned from this channel.')
-        #         await message.channel.send(f'A report has successfully been filed against user: {message.author.name}. This is the user\'s third report and as a result they are banned from this channel.')
-        #         await message.author.send(f'Dear {message.author.name}, a report has been successfully filed against you.\nThis is your third strike. As a result, you have been banned from the channel.')
-        
         # Check if user is banned from the group
         myquery = { "_id": message.author.id }
         num_reports = collection.count_documents(myquery)
