@@ -108,7 +108,7 @@ class ModBot(discord.Client):
         if after_msg.channel.name == f'group-{self.group_num}':
             before_msg.content = self.decode_msg(before_msg)
             after_msg.content = self.decode_msg(after_msg)
-            await self.auto_handle_message(before_msg)
+            # await self.auto_handle_message(before_msg)
             await self.auto_handle_message(after_msg)
 
 

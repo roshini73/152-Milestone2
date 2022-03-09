@@ -49,26 +49,30 @@ class Moderator:
             if self.report.reportReason not in self.reasons else "Type one of the following keys to identify why is this post is harmful? \nA: False Information\nB: Spam \nC: Harassment \nD: Violence \nE: Terrorism \nF: Hate Speech"
 
             self.state = State.AWAITING_CATEGORY
-            if (self.report.auto):
-                return(["There is a report for the following message: " + "```" + self.report.message.author.name + ": " + self.report.message.content + "```" + \
-                    "This post was automatically flagged by our bot. \nPlease answer some questions to help our friendly flagging bot. \nIs this post actually being live streamed? " + \
-                    "If so, please confirm by typing \'Y\'. Type \'N\' if not."])
-            #reason = self.report.reportReason
             details = "" if not self.report.extra else "The user provided the following additional information: " + self.report.extra
             live = "It is reported to contain a livestream." if self.report.livestream else ""
             imm = self.report.immediate*"ongoing or immediate "
+            if (self.report.auto):
+                return(["There is a report for the following message: " + "```" + self.report.message.author.name + ": " + self.report.message.content + "```" + \
+                    "This post was automatically flagged by our bot. \n" + "Type one of the following keys to identify why is this post is harmful? \nA: False Information\nB: Spam \nC: Harassment \nD: Violence \nE: Terrorism \nF: Hate Speech"])
+            #reason = self.report.reportReason
+            
             return(["There is a report for the following message: " + "```" + self.report.message.author.name + ": " + self.report.message.content + "```" + \
             "The post was reported for "  + imm + self.report.reportReason + ". " + details + live + "\n" + q])
 
         if self.state == State.AWAITING_CATEGORY:
+            if (self.report.auto and message.content in self.reasons):
+                self.category = self.reasons[message.content]
             if message.content == 'G':
                 self.state = State.MODERATION_COMPLETE
                 self.outcome = "The post was not found to be harmful and no action has been taken at this time."
                 return["The moderation process for this report is now complete."]
-            elif message.content == self.YES_KEYWORD:
+            elif message.content == self.YES_KEYWORD and self.report.reportReason in self.reasons:
                 self.category = self.report.reportReason
-            else:
+            elif message.content in self.reasons:
                 self.category = self.reasons[message.content]
+            else: 
+                return["Not a valid option, please choose again from the prompt or type 'cancel' to cancel moderation."]
             self.state = State.AWAITING_IMMEDIACY
             return["Do the contents of this post pose an ongoing or immediate threat? Type 'Y' for yes and 'N' for no."]
 
@@ -77,17 +81,18 @@ class Moderator:
                 self.immediate = True
                 self.state = State.AWAITING_LIVESTREAM
                 return["You stated that the contents of this post pose an ongoing or immediate threat. Is this post being livestreamed? Type 'Y' for yes and 'N' for no."]
-            else:
+            elif message.content == self.NO_KEYWORD:
                 self.immediate = False
                 self.state = State.AWAITING_DECISION
                 return[self.get_recommendations()]
+
 
         if self.state == State.AWAITING_LIVESTREAM:
             if message.content == self.YES_KEYWORD:
                 self.state = State.AWAITING_SOURCE
                 self.livestream = True
                 return["Who is livestreaming this event? If it is the perpetrator please type 'P'. If it is a victim, type 'V'."]
-            else:
+            elif message.content == self.NO_KEYWORD:
                 self.state = State.AWAITING_DECISION
                 self.livestream = False
                 return[self.get_recommendations()]
@@ -107,13 +112,17 @@ class Moderator:
             self.state = State.AWAITING_DECISION
             if message.content == self.YES_KEYWORD:
                 self.helpful = True
-            else:
+                return[self.get_recommendations()]
+            elif message.content == self.NO_KEYWORD:
                 self.helpful = False
-            return[self.get_recommendations()]
+                return[self.get_recommendations()]
 
         if self.state == State.AWAITING_DECISION:
             self.state = State.MODERATION_COMPLETE
             actions = [int(i) for i in message.content.split(",")]
+            for i in actions:
+                if (i not in range(1,6)):
+                    return ["Not a valid option, please type again with each number separated by commas or type 'cancel' to cancel moderation."]
             return[self.get_outcome(actions)]
 
         if (message.content == self.CANCEL_KEYWORD):
