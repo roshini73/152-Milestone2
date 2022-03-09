@@ -70,7 +70,7 @@ class ModBot(discord.Client):
         # Ignore messages from us
         if message.author.id == self.user.id:
             return
-
+        
         # Check if this message was sent in a server ("guild") or if it's a DM
         if message.guild:
             await self.handle_channel_message(message)
