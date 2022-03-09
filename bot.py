@@ -92,9 +92,9 @@ class ModBot(discord.Client):
             user = collection.find(myquery)
             for result in user:
                 score = result["score"]
-
+            
+            # user is banned from the group
             if score >= 3:
-                # await mod_channel.send(f'User: {message.author.name} is banned from this channel but has sent a message to the channel.')
                 await message.channel.send(f'User: {message.author.name} is banned from this channel but has sent a message.\nPlease ignore the above message.')
                 await message.author.send(f'Dear {message.author.name}, you are banned from this channel but have sent a message to the channel.\nPlease do not send another message to the channel.')
 
@@ -283,11 +283,9 @@ class ModBot(discord.Client):
                 collection.insert_one(post)
                 await mod_channel.send(f'A first successful report against user: {reported_name} has been filed. This user has been added to the db and is banned from the channel.')
 
-            # this user has had 5 or less reports filed against them
+            # this user has had 1 or more reports filed against them
             else:
-                user = collection.find(query)
-                for result in user:
-                    score = result["score"]
+                # set score to 3 because user is banned
                 score = 3
                 collection.update_one({"_id":reported_id}, {"$set":{"score":score}})
                 await mod_channel.send(f'A successful report against user: {reported_name} has been filed. This user has been added to the db and is banned from the channel.')        
@@ -303,12 +301,13 @@ class ModBot(discord.Client):
                 await mod_channel.send(f'A first successful report against user: {reported_name} has been filed. This user has been added to the db.')
                 await self.modReport.message.author.send(f'This is your first strike. After three strikes you will be banned from the channel.')
 
-            # this user has had 5 or less reports filed against them
+            # this user has had 1 or more reports filed against them
             else:
                 query = {"_id": reported_id}
                 user = collection.find(query)
                 for result in user:
                     score = result["score"]
+                # add 1 to the user's reports
                 score = score + 1
                 collection.update_one({"_id":reported_id}, {"$set":{"score":score}})
 
@@ -326,28 +325,28 @@ class ModBot(discord.Client):
             await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ".")
             await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas found to be harmful due to " + self.mod.category + ".")
 
-                        # this user has had no reports filed against them
+            # this user has had no reports filed against them
             if num_reports <= 0:
                 post = {"_id": reported_id, "score": 1}
                 collection.insert_one(post)
-                await mod_channel.send(f'A first successful report against user: {message.author.name} has been filed. This user has been added to the db.')
+                await mod_channel.send(f'A first successful report against user: {reported_name} has been filed. This user has been added to the db.')
                 await self.modReport.message.author.send(f'This is your first strike. After three strikes you will be banned from the channel.')
 
-            # this user has had 5 or less reports filed against them
+            # this user has had 1 or more reports filed against them
             else:
                 query = {"_id": reported_id}
                 user = collection.find(query)
                 for result in user:
                     score = result["score"]
+                # add 1 to the user's reports
                 score = score + 1
                 collection.update_one({"_id":reported_id}, {"$set":{"score":score}})
 
                 if score == 2:
                     await self.modReport.message.author.send(f'This is your second strike. After three strikes you will be banned from the channel.')
 
-
                 if score >= 3:
-                    await mod_channel.send(f'A report has successfully been filed against user: {message.author.name}. This is the user\'s third report and as a result they are banned from this channel.')
+                    await mod_channel.send(f'A report has successfully been filed against user: {reported_name}. This is the user\'s third report and as a result they are banned from this channel.')
                     await self.modReport.message.channel.send(f'This is the user\'s third report and as a result they are banned from this channel.')
                     await self.modReport.message.author.send(f'This is your third strike. As a result, you have been banned from the channel.')
         
@@ -362,11 +361,9 @@ class ModBot(discord.Client):
                 collection.insert_one(post)
                 await mod_channel.send(f'A first successful report against user: {reported_name} has been filed. This user has been added to the db and is banned from the channel.')
 
-            # this user has had 5 or less reports filed against them
+            # this user has had 1 or more reports filed against them
             else:
-                user = collection.find(query)
-                for result in user:
-                    score = result["score"]
+                # set score to 3 because user is banned
                 score = 3
                 collection.update_one({"_id":reported_id}, {"$set":{"score":score}})
                 await mod_channel.send(f'A successful report against user: {reported_name} has been filed. This user has been added to the db and is banned from the channel.')        
