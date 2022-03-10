@@ -90,10 +90,10 @@ class Report:
                 self.reason = True
             if message.content in self.reasons:
                 self.reportReason = self.reasons[message.content]
-                self.priority += self.priorities[self.reportReason]
+                # self.priority += self.priorities[self.reportReason]
             else:
                 self.reportReason = message.content
-                self.priority += 1
+                # self.priority += 1
 
             self.state = State.AWAITING_IMMEDIACY
             return["Do the contents of this post pose an ongoing or immediate threat? Type 'Y' for yes and 'N' for no."]
@@ -101,19 +101,19 @@ class Report:
         if self.state == State.AWAITING_IMMEDIACY:
             if message.content == self.YES_KEYWORD:
                 self.immediate = True
-                self.priority += 2
+                # self.priority += 2
                 self.state = State.AWAITING_LIVESTREAM
                 return["You stated that the contents of this post pose an ongoing or immediate threat. Is this post being livestreamed? Type 'Y' for yes and 'N' for no."]
             else:
                 self.state = State.AWAITING_DETAILS
-                self.priority += 1
+                # self.priority += 1
                 return["If you would like to provide any additional details, please do so now. Otherwise type 'N'."]
 
         if self.state == State.AWAITING_DETAILS:
             self.state = State.AWAITING_MODERATION
             if message.content != self.NO_KEYWORD:
                 self.extra = message.content
-            print(self.priority)
+            # print(self.priority)
             if self.livestream:
                 return ["Thank you. Our content moderation team will review this post with high priority. The post may be removed or flagged and/or the user may be banned."]
             else:
@@ -122,10 +122,10 @@ class Report:
         if self.state == State.AWAITING_LIVESTREAM:
             if message.content == self.YES_KEYWORD:
                 self.livestream = True
-                self.priority += 2
+                # self.priority += 2
             else:
                 self.livestream = False
-                self.priority += 1
+                # self.priority += 1
             self.state = State.AWAITING_DETAILS
             return ["If you would like to provide any additional details, please do so now. Otherwise type 'N'."]
 

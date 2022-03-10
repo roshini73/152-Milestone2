@@ -19,6 +19,7 @@ cluster = MongoClient("mongodb+srv://ammaaradam:cs152group46@cs152.opkgt.mongodb
 db = cluster["UserData"]
 
 collection = db["UserData"]
+message_data = db["MessageData"]
 
 # Set up logging to the console
 logger = logging.getLogger('discord')
@@ -270,6 +271,8 @@ class ModBot(discord.Client):
         if stored:
             await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas stored in our db.")
             await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas stored in our db.")
+            post = {"_id": reported_id, "message": self.modReport.message.content, "threat_score": self.modReport.message.priority}
+            message_data.insert_one(post)
 
         # Check if user is banned from the group
         query = { "_id": reported_id }
