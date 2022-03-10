@@ -16,6 +16,8 @@ from report import Report
 
 cluster = MongoClient("mongodb+srv://ammaaradam:cs152group46@cs152.opkgt.mongodb.net/test")
 
+terrorist_orgs= ["Abu Sayyaf Group (ASG)", "Aum Shinrikyo (AUM)", "Basque Fatherland and Liberty (ETA)", "Gama’a al-Islamiyya (Islamic Group – IG)", "HAMAS", "Harakat ul-Mujahidin (HUM)", "Hizballah", "Kahane Chai (Kach)", "Kurdistan Workers Party (PKK, aka Kongra-Gel)", "Liberation Tigers of Tamil Eelam (LTTE)", "National Liberation Army (ELN)", "Palestine Liberation Front (PLF)", "Palestine Islamic Jihad (PIJ)", "Popular Front for the Liberation of Palestine (PFLP)", "PFLP-General Command (PFLP-GC)", "Revolutionary People’s Liberation Party/Front (DHKP/C)", "Shining Path (SL)", "al-Qa’ida (AQ)", "Islamic Movement of Uzbekistan (IMU)", "Real Irish Republican Army (RIRA)", "Jaish-e-Mohammed (JEM)", "Lashkar-e Tayyiba (LeT)", "Al-Aqsa Martyrs Brigade (AAMB)", "Asbat al-Ansar (AAA)", "al-Qaida in the Islamic Maghreb (AQIM)", "Communist Party of the Philippines/New People’s Army (CPP/NPA)", "Jemaah Islamiya (JI)", "Lashkar i Jhangvi (LJ)", "Ansar al-Islam (AAI)", "Continuity Irish Republican Army (CIRA)", "Islamic State of Iraq and the Levant (formerly al-Qa’ida in Iraq)", "Islamic Jihad Union (IJU)", "Harakat ul-Jihad-i-Islami/Bangladesh (HUJI-B)", "al-Shabaab", "Revolutionary Struggle (RS)", "Kata’ib Hizballah (KH)", "al-Qa’ida in the Arabian Peninsula (AQAP)", "Harakat ul-Jihad-i-Islami (HUJI)", "Tehrik-e Taliban Pakistan (TTP)", "Jaysh al-Adl (formerly Jundallah)", "Army of Islam (AOI)", "Indian Mujahedeen (IM)", "Jemaah Anshorut Tauhid (JAT)", "Abdallah Azzam Brigades (AAB)", "Haqqani Network (HQN)", "Ansar al-Dine (AAD)", "Boko Haram", "Ansaru", "al-Mulathamun Battalion (AMB)", "Ansar al-Shari’a in Benghazi", "Ansar al-Shari’a in Darnah", "Ansar al-Shari’a in Tunisia", "ISIL Sinai Province (formerly Ansar Bayt al-Maqdis)", "al-Nusrah Front", "Mujahidin Shura Council in the Environs of Jerusalem (MSC)", "Jaysh Rijal al-Tariq al Naqshabandi (JRTN)", "ISIL-Khorasan (ISIL-K)", "Islamic State of Iraq and the Levant’s Branch in Libya (ISIL-Libya)", "Al-Qa’ida in the Indian Subcontinent", "Hizbul Mujahideen (HM)", "ISIS-Bangladesh", "ISIS-Philippines", "ISIS-West Africa", "ISIS-Greater Sahara", "al-Ashtar Brigades (AAB)", "Jama’at Nusrat al-Islam wal-Muslimin (JNIM)", "Islamic Revolutionary Guard Corps (IRGC)", "Asa’ib Ahl al-Haq (AAH)", "Harakat Sawa’d Misr (HASM)", "ISIS-DRC", "ISIS-Mozambique", "Segunda Marquetalia", "Revolutionary Armed Forces of Colombia – People’s Army (FARC-EP)"]
+
 db = cluster["UserData"]
 
 collection = db["UserData"]
@@ -271,7 +273,7 @@ class ModBot(discord.Client):
         if stored:
             await post_channel.send(f"The following post: ```{reported_name}:{self.modReport.message.content}```\nwas stored in our db.")
             await reported_user.send(f"Hi {reported_name}. Your post ```{self.modReport.message.content}```\nwas stored in our db.")
-            post = {"_id": reported_id, "message": self.modReport.message.content, "threat_score": self.modReport.message.priority}
+            post = {"_id": reported_id, "message": self.modReport.message.content, "threat_score_out_of_100": self.modReport.priority}
             message_data.insert_one(post)
 
         # Check if user is banned from the group
@@ -391,6 +393,14 @@ class ModBot(discord.Client):
         message.content = self.decode_msg(message)
         perspective = self.eval_text(message)
         score = self.calculate_score(perspective)
+
+        for i in message.content.split():
+            if i in terrorist_orgs:
+                self.add_report(message)
+                await self.share_report(self.user.name, self.addReport, message)
+                self.addReport = None
+                return
+
         # print("Score of message " + message.content + " is: " + str(score))
         # print("Threshold level: " + str(self.threshold))
         if (score > self.threshold): #add to reporting flow for moderators
